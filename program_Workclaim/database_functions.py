@@ -3,6 +3,7 @@ import traceback
 import bcrypt
 import psycopg.rows
 
+
 class Database:
     _instance = None
 
@@ -14,6 +15,7 @@ class Database:
             cls._instance = super(Database, cls).__new__(cls)
             cls._instance._init_connection()
         return cls._instance
+
 
     def _init_connection(self):
         try:
@@ -30,10 +32,9 @@ class Database:
             print(f"Veritabanı bağlantısı başarısız. Hata mesajı: {e}")
             self.db = None
             self.cursor = None
-    
-    
-    
-    """user_id'den kullanıcı rolü belirleniyor.Şimdilik placeholder bir kriter koydum."""
+
+
+        """user_id'den kullanıcı rolü belirleniyor.Şimdilik placeholder bir kriter koydum."""
     def register_user(self, user_id, username, password):
         try:
             user_id_str = str(user_id)
@@ -42,15 +43,29 @@ class Database:
             if len(user_id_str) != 11 or not user_id_str.isdigit():
                 return "user_id 11 haneli sayısal olmalıdır."
 
+            # username kontrolü
+            if username is None or not str(username).strip():
+                return "Kullanıcı adı boş bırakılamaz."
+            if len(username.strip()) < 5:
+                return "Kullanıcı adı en az 5 karakter olmalıdır."
+
+            # password kontrolü
+            if password is None or not str(password).strip():
+                return "Şifre boş bırakılamaz."
+            if len(password) < 5:
+                return "Şifre en az 5 karakter olmalıdır."
+
+            username = username.strip()
+
             # user_id kontrolü (veritabanında var mı)
             check_query = "SELECT COUNT(*) FROM users WHERE user_id = %s"
             self.cursor.execute(check_query, (user_id,))
             user_exists = self.cursor.fetchone()[0] > 0
 
             if user_exists:
-                return "Bu kullanıcı zaten mevcut, ya yeni bir kullanıcı adı seçin ya da giriş yapın."
+                return "Bu kullanıcı zaten mevcut, ya giriş yapın."
 
-            # rol belirleme, bu kısım henüz prototip.
+            # rol belirleme
             if user_id_str.startswith("222"):
                 role = 1  # öğrenci
             elif user_id_str.startswith("333"):
@@ -60,7 +75,7 @@ class Database:
             else:
                 return "Geçersiz user_id formatı. (222 / 333 / 444 ile başlamalı)"
 
-            # şifre hasleme
+            # şifre hashleme
             hashed_password = bcrypt.hashpw(
                 password.encode("utf-8"),
                 bcrypt.gensalt()
@@ -76,22 +91,23 @@ class Database:
 
             if self.cursor.rowcount > 0:
                 return "Kullanıcı sisteme eklendi."
-            else:
-                return "Kullanıcı sisteme eklenemedi."
+            return "Kullanıcı sisteme eklenemedi."
+
 
         except psycopg.Error as err:
             self.db.rollback()
             print(f"Veritabanı hatası: {err}")
             traceback.print_exc()
             return "Veritabanı operasyonu esnasında hata oluştu!"
-         
-        
+
+
 
     """user_id ve şifre bu kısımda kontrol ediliyor."""
     """user_id mevcutsa hashli şifre veritabanından çekiliyor."""
     """Parametrede verilen password hash ediliyor, eğer hashli password ile uyuyorsa True, uymuyorsa false dönüyor."""
     def login_user(self, user_id, password):
         try:
+            
             # user_id format kontrolü
             user_id_str = str(user_id)
 
@@ -112,19 +128,20 @@ class Database:
             else:
                 return False
 
+
         except psycopg.Error as err:
             print(f"Veritabanı hatası oluştu. Hata mesajı: {err}")
             traceback.print_exc()
             return False
 
+
         except Exception as e:
             print(f"Beklenmeyen bir durum oluştu.Hata mesajı: {e}")
             traceback.print_exc()
             return False
-        
-        
-        
-    
+
+
+
     """Uygulama kapatılırken veritabanı bağlantısını sonlandırır."""
     def close_connection(self):
         try:
@@ -135,52 +152,58 @@ class Database:
             print("Veritabanı bağlantısı sona erdi")
         except Exception as e:
             print(f"Bağlantı kapatılırken hata oluştu.Hata mesajı: {e}")
-            
-            
-            
-    
-    """Kullanıcının sahip olduğu bütün rezervasyonları döndürür."""        
+
+
+
+
+    """Kullanıcının sahip olduğu bütün rezervasyonları döndürür."""
     def get_reservations(self, user_id):
         try:
             check_query = """
-                SELECT reservation_id, facility_id,  date, start_time, end_time, status
+                SELECT reservation_id, facility_id, date, start_time, end_time, status
                 FROM reservations
                 WHERE user_id = %s
                 ORDER BY date DESC
-                """
+            """
             self.cursor.execute(check_query, (user_id,))
             rows = self.cursor.fetchall()
-
-            return rows  
+            
+            
+            return rows
 
         except psycopg.Error as err:
             print(f"Reservasyon döndürme işlemi sırasında hata oluştu. Hata Mesajı: {err}")
             traceback.print_exc()
             return []
-        
-        
-        
-    """reservation_id ile belirtilmiş rezervasyonu veritabanından döndürür."""        
+
+
+
+
+
+    """reservation_id ile belirtilmiş rezervasyonu veritabanından döndürür.""" 
     def get_reservation(self, reservation_id):
         try:
             check_query = """
                 SELECT reservation_id, user_id, facility_id, date, start_time, end_time, status
                 FROM reservations
                 WHERE reservation_id = %s
-                """
+            """
             self.cursor.execute(check_query, (reservation_id,))
             rows = self.cursor.fetchone()
+            
+            
+            return rows
 
-            return rows  
 
         except psycopg.Error as err:
             print(f"Reservasyon döndürme işlemi sırasında hata oluştu. Hata Mesajı: {err}")
             traceback.print_exc()
             return None
-        
-        
-        
-    """Kullanıcının reservation_id ile belirtilmiş rezervasyonunu iptal eder."""        
+
+
+
+
+    """Kullanıcının reservation_id ile belirtilmiş rezervasyonunu iptal eder."""
     def cancel_reservation(self, reservation_id):
         try:
             query = """
@@ -191,10 +214,12 @@ class Database:
             self.cursor.execute(query, ("cancelled", reservation_id))
             self.db.commit()
 
+
             if self.cursor.rowcount > 0:
                 return "Rezervasyon başarıyla iptal edildi."
             else:
                 return "İptal edilecek rezervasyon veritabanında bulunamadı."
+
 
         except psycopg.Error as err:
             self.db.rollback()
@@ -202,39 +227,42 @@ class Database:
             traceback.print_exc()
             return "Rezervasyon iptal işlemi sırasında hata oluştu!"
         
-    
-    
-    
-    """Kullanıcının hesabını veritabanından kaldırır ve tüm randevularının status değerini "cancelled" olarak günceller"""        
+        
+        
+        
+    """Kullanıcının hesabını veritabanından kaldırır ve tüm randevularının status değerini "cancelled" olarak günceller"""
     def delete_user(self, user_id):
         try:
-            # kullacının mevcut olup olmadığı kontrol ediliyor.
+            # kullacının mevcut olup olmadığı kontrol edilir
             self.cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
             if self.cursor.fetchone() is None:
                 return "Kullanıcı bulunamadı."
 
-            # kullanıcı rezervasyonları "cancelled" olarak işaretleniyor.
+            # kullanıcı rezervasyonları "cancelled" olarak işaretleni
             self.cursor.execute("""
                 UPDATE reservations
                 SET status = %s
                 WHERE user_id = %s
             """, ("cancelled", user_id))
-
+            
+            
             # kullanıcıyı sil
             self.cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
-
+            
+            
             self.db.commit()
             return "Kullanıcı ve rezervasyonları başarıyla silindi."
+
 
         except psycopg.Error as err:
             self.db.rollback()
             print(f"Hata: {err}")
             traceback.print_exc()
             return "Hesap silme işlemi esnasında hata oluştu!"
-    
-    
-    
-    """Veritabanından "user_id ile belirtilmiş kullanıcı döndürür.""" 
+        
+        
+        
+    """Veritabanından "user_id ile belirtilmiş kullanıcı döndürür."""
     def get_user(self, user_id):
         try:
             query = """
@@ -253,10 +281,10 @@ class Database:
         except Exception as e:
             print(f"Beklenmeyen bir durum oluştu. Hata mesajı: {e}")
             traceback.print_exc()
-            return None 
-    
-    
-    
+            return None
+
+
+
     """Veritabanında parametrede verilen filtrelere uygun rezervasyonları döndürür.""" 
     def filter_facilities(self, facility_type=None, capacity=None, has_screen=None,
                       has_sound_system=None, has_whiteboard=None,
@@ -313,10 +341,9 @@ class Database:
             print(f"Randevuların getirilmesi esnasında hata oluştu.Hata mesajı: {e}")
             traceback.print_exc()
             return []  
-    
-    
-    
-    """Veritabanından rezervasyon alma fonksiyonu"""
+
+
+    """Veritabanından rezervasyon alma fonksiyon"""
     def reserve(self, user_id, reservation_id):
         try:
             # Rezervasyonu almak isteyen kullanıcının rolünü çekiyoruz.
@@ -329,6 +356,7 @@ class Database:
 
             requester_role = requester[0]
 
+
             # Race condition oluşmaması için ilgili rezervasyon satırını kilitliyoruz.
             reservation_query = """
                 SELECT reservation_id, user_id, status
@@ -339,11 +367,13 @@ class Database:
             self.cursor.execute(reservation_query, (reservation_id,))
             reservation = self.cursor.fetchone()
 
+
             # İstenen reservation_id veritabanında yoksa işlem iptal edilir.
             if reservation is None:
                 return "Belirtilen reservation_id için rezervasyon kaydı bulunamadı."
 
             _, current_user_id, current_status = reservation
+
 
             # Slot boşsa ya da daha önce iptal edildiyse kullanıcı rezervasyonu direkt alabilir.
             if current_status in ("empty", "cancelled"):
@@ -353,15 +383,13 @@ class Database:
                         status = %s
                     WHERE reservation_id = %s
                 """
-                self.cursor.execute(
-                    update_query,
-                    (user_id, "reserved", reservation_id)
-                )
+                self.cursor.execute(update_query, (user_id, "reserved", reservation_id))
                 self.db.commit()
                 return "Rezervasyon başarıyla oluşturuldu."
 
+
             # Buraya geldiysek rezervasyon hali hazırda doludur.
-            # Mevcut rezervasyon sahibinin rolünü çekiyoruz.
+            # Mevcut rezervasyon sahibinin rolünü çekiyor
             current_user_query = "SELECT role FROM users WHERE user_id = %s"
             self.cursor.execute(current_user_query, (current_user_id,))
             current_user = self.cursor.fetchone()
@@ -372,6 +400,7 @@ class Database:
 
             current_user_role = current_user[0]
 
+
             # Yeni kullanıcının rolü daha büyükse override yapabilir.
             if requester_role > current_user_role:
                 override_query = """
@@ -380,14 +409,14 @@ class Database:
                         status = %s
                     WHERE reservation_id = %s
                 """
-                self.cursor.execute(
-                    override_query,
-                    (user_id, "reserved", reservation_id)
-                )
-
+                
+                self.cursor.execute(override_query, (user_id, "reserved", reservation_id))
+                
+                
                 # Eski rezervasyon sahibini haberdar etmek için notify tablosuna kayıt eklenir.
                 self.notify_cancellation(current_user_id, reservation_id)
-
+                
+                
                 self.db.commit()
                 return "Rezervasyon override edilerek kullanıcıya verildi. Eski kullanıcı için bildirim kaydı oluşturuldu."
 
@@ -408,7 +437,7 @@ class Database:
 
 
 
-    """Override edilen kullanıcı için notify tablosuna kayıt ekler.""",
+    """Override edilen kullanıcı için notify tablosuna kayıt ekler."""
     """Burada notify adında yeni bir database tablosuna ihtiyaç duyacağız."""
     """Dokümanlarda database tabloları kısmına bu tablo da eklenecek."""
     def notify_cancellation(self, user_id, reservation_id):
@@ -425,8 +454,9 @@ class Database:
             print(f"İptal bildirimi eklenirken hata oluştu: {err}")
             traceback.print_exc()
             raise
-    
-   
+
+
+
 
     """Veritabanından reservation_id ile belirtilmiş rezervasyonu döndürür."""
     def get_reservation_info(self, reservation_id):
@@ -434,7 +464,7 @@ class Database:
             with self.db.cursor(row_factory=psycopg.rows.dict_row) as cur:
                 cur.execute("""
                     SELECT reservation_id, user_id, facility_id,
-                        date, start_time, end_time, status
+                           date, start_time, end_time, status
                     FROM reservations
                     WHERE reservation_id = %s
                 """, (reservation_id,))
@@ -444,8 +474,8 @@ class Database:
             print(f"Hata: {err}")
             traceback.print_exc()
             return None
-    
-    
+
+
     """Kullanıcıya ait bildirimleri döndürür ve notify tablosundan siler."""
     """Login olduğunda override edilen randevuların kullanıcıya görünmesi için bu fonksiyon kullanılıyor."""
     def bring_notifications(self, user_id):
@@ -472,12 +502,13 @@ class Database:
             self.cursor.execute(query, (user_id,))
             notifications = self.cursor.fetchall()
 
+
             # Bildirimleri okuduktan sonra notify tablosundan siliyoruz.
             # Yeniden login yaptığımız zaman geçmişte override edilmiş randevular silindiği için bir daha yeniden gözükmüyor.
             delete_query = "DELETE FROM notify WHERE user_id = %s"
             self.cursor.execute(delete_query, (user_id,))
-
             self.db.commit()
+
             return notifications
 
         except psycopg.Error as err:
@@ -491,3 +522,28 @@ class Database:
             print(f"Beklenmeyen bir hata oluştu: {e}")
             traceback.print_exc()
             return []
+
+
+    """Uygun facility ID'ye sahip rezervasyon sistemde mevcut mu diye bakıyoruz."""
+    def find_reservation_slot(self, facility_id, date, start_time, end_time):
+        try:
+            query = """
+                SELECT reservation_id
+                FROM reservations
+                WHERE facility_id = %s
+                  AND date = %s::date
+                  AND start_time = %s::time
+                  AND end_time = %s::time
+                LIMIT 1
+            """
+            self.cursor.execute(query, (facility_id, date, start_time, end_time))
+            row = self.cursor.fetchone()
+
+            if row is None:
+                return None
+            return row[0]
+
+        except psycopg.Error as err:
+            print(f"Reservation slot aranırken hata oluştu: {err}")
+            traceback.print_exc()
+            return None
