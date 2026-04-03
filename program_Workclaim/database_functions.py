@@ -343,6 +343,85 @@ class Database:
             return []  
 
 
+    """Kullanıcının rolüne göre sahip olduğu maksimum rezervasyon limitini döndürür."""
+    def get_user_reservation_limit(self, user_id):
+        try:
+            role_query = "SELECT role FROM users WHERE user_id = %s"
+            self.cursor.execute(role_query, (user_id,))
+            result = self.cursor.fetchone()
+
+            if result is None:
+                return None
+
+            role = result[0]
+
+            # rol 1 = öğrenci, rol 2 = öğretmen, rol 3 = yönetim
+            if role == 1:
+                return 3
+            elif role == 2:
+                return 5
+            elif role == 3:
+                return 8
+            else:
+                return None
+
+        except psycopg.Error as err:
+            print(f"Kullanıcı rezervasyon limiti alınırken hata oluştu. Hata mesajı: {err}")
+            traceback.print_exc()
+            return None
+
+        except Exception as e:
+            print(f"Beklenmeyen bir hata oluştu. Hata mesajı: {e}")
+            traceback.print_exc()
+            return None
+
+
+    """Kullanıcının aktif durumdaki rezervasyon sayısını döndürür."""
+    def get_active_reservation_count(self, user_id):
+        try:
+            query = """
+                SELECT COUNT(*)
+                FROM reservations
+                WHERE user_id = %s
+                  AND status = %s
+            """
+            self.cursor.execute(query, (user_id, "reserved"))
+            result = self.cursor.fetchone()
+
+            if result is None:
+                return 0
+
+            return result[0]
+
+        except psycopg.Error as err:
+            print(f"Aktif rezervasyon sayısı alınırken hata oluştu. Hata mesajı: {err}")
+            traceback.print_exc()
+            return 0
+
+        except Exception as e:
+            print(f"Beklenmeyen bir hata oluştu. Hata mesajı: {e}")
+            traceback.print_exc()
+            return 0
+
+
+    """Kullanıcının rezervasyon limitine ulaşıp ulaşmadığını kontrol eder."""
+    def has_reached_reservation_limit(self, user_id):
+        try:
+            reservation_limit = self.get_user_reservation_limit(user_id)
+
+            if reservation_limit is None:
+                return False
+
+            active_count = self.get_active_reservation_count(user_id)
+
+            return active_count >= reservation_limit
+
+        except Exception as e:
+            print(f"Rezervasyon limiti kontrol edilirken hata oluştu. Hata mesajı: {e}")
+            traceback.print_exc()
+            return False
+
+
     """Veritabanından rezervasyon alma fonksiyon"""
     def reserve(self, user_id, reservation_id):
         try:
@@ -355,6 +434,11 @@ class Database:
                 return "Rezervasyon yapmaya çalışan kullanıcı bulunamadı."
 
             requester_role = requester[0]
+
+            # Kullanıcı rezervasyon limitine ulaştıysa yeni rezervasyon alamaz.
+            if self.has_reached_reservation_limit(user_id):
+                reservation_limit = self.get_user_reservation_limit(user_id)
+                return f"Rezervasyon limitine ulaştınız. En fazla {reservation_limit} aktif rezervasyon alabilirsiniz."
 
 
             # Race condition oluşmaması için ilgili rezervasyon satırını kilitliyoruz.

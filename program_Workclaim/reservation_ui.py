@@ -1,6 +1,5 @@
 import sys
 
-
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QComboBox, QDateEdit, QPushButton,
     QVBoxLayout, QHBoxLayout, QFormLayout, QFrame, QMessageBox, QListWidget,
@@ -10,7 +9,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import QDate, Qt
 
 # Veritabanı işlemlerini yapan sınıfı burada backend olarak kullanıyoruz.
-from Workclaim_Database import Database
+from database_functions import Database
 
 
 class ReservationScreen(QWidget):
@@ -329,6 +328,17 @@ class ReservationScreen(QWidget):
                 self,
                 "Time Error",
                 "End time must be after the start time."
+            )
+            return
+
+        # Kullanıcı rezervasyon limitine ulaştıysa arayüz tarafında da uyarı veriyoruz.
+        if self.db.has_reached_reservation_limit(self.current_user_id):
+            reservation_limit = self.db.get_user_reservation_limit(self.current_user_id)
+
+            QMessageBox.warning(
+                self,
+                "Reservation Limit Reached",
+                f"You have reached your reservation limit. You can have at most {reservation_limit} active reservations."
             )
             return
 
