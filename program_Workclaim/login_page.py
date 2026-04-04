@@ -301,8 +301,16 @@ class MainWindow(QStackedWidget):
         self.setCurrentWidget(self.login_page)
 
     def login_success(self, user_id):
-        self.home_page.load_user(user_id)
-        self.setCurrentWidget(self.home_page)
+        # 1. Main menüyü oluştur ve user_id'yi pasla
+        from main_menu import Main 
+        self.main_menu_page = Main(user_id=user_id)
+        
+        # 2. StackedWidget'a ekle ve oraya geç
+        self.addWidget(self.main_menu_page)
+        self.setCurrentWidget(self.main_menu_page)
+        
+        # Pencere boyutunu ana menü için büyüt
+        self.window().resize(1000, 700)
 
     def logout(self):
         self.setCurrentWidget(self.login_page)

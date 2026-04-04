@@ -260,6 +260,17 @@ class Database:
             traceback.print_exc()
             return "Hesap silme işlemi esnasında hata oluştu!"
         
+
+    def update_password(self, user_id, new_password):
+        try:
+            salt = bcrypt.gensalt()
+            hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), salt).decode('utf-8')
+            self.cursor.execute("UPDATE users SET password = %s WHERE user_id = %s", (hashed_password, user_id))
+            self.db.commit()
+            return "Password updated successfully."
+        except Exception as e:
+            return f"Error: {e}"
+        
         
         
     """Veritabanından "user_id ile belirtilmiş kullanıcı döndürür."""
