@@ -1,6 +1,3 @@
-```md
-## Test Output
-
 ```text
 ============================================================================= test session starts =============================================================================
 platform win32 -- Python 3.13.1, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\USEr\AppData\Local\Programs\Python\Python313\python.exe
