@@ -241,7 +241,8 @@ class Database:
             # kullanıcı rezervasyonları "cancelled" olarak işaretleni
             self.cursor.execute("""
                 UPDATE reservations
-                SET status = %s
+                SET status = %s,
+                user_id = NULL
                 WHERE user_id = %s
             """, ("cancelled", user_id))
             
@@ -642,3 +643,105 @@ class Database:
             print(f"Reservation slot aranırken hata oluştu: {err}")
             traceback.print_exc()
             return None
+        
+    def get_override_details(self, requester_user_id, reservation_id):
+        try:
+            # İstek yapan kullanıcının rolünü al
+            self.cursor.execute(
+                "SELECT user_id, username, role FROM users WHERE user_id = %s",
+                (requester_user_id,)
+            )
+            requester = self.cursor.fetchone()
+
+            if requester is None:
+                return {
+                    "can_override": False,
+                    "message": "Rezervasyon yapmaya çalışan kullanıcı bulunamadı."
+                }
+
+            requester_id, requester_name, requester_role = requester
+
+            # İlgili rezervasyon satırını al
+            self.cursor.execute("""
+                SELECT reservation_id, user_id, facility_id, date, start_time, end_time, status
+                FROM reservations
+                WHERE reservation_id = %s
+            """, (reservation_id,))
+            reservation = self.cursor.fetchone()
+
+            if reservation is None:
+                return {
+                    "can_override": False,
+                    "message": "Belirtilen reservation_id için rezervasyon kaydı bulunamadı."
+                }
+
+            _, current_user_id, facility_id, date, start_time, end_time, status = reservation
+
+            # Boş veya cancelled ise override yok, direkt normal rezervasyon
+            if status in ("empty", "cancelled"):
+                return {
+                    "can_override": False,
+                    "needs_confirmation": False,
+                    "message": "Bu slot doğrudan alınabilir."
+                }
+
+            # Kendi rezervasyonunu tekrar almaya çalışıyorsa
+            if str(current_user_id) == str(requester_user_id):
+                return {
+                    "can_override": False,
+                    "needs_confirmation": False,
+                    "message": "Bu rezervasyon zaten size ait."
+                }
+
+            # Mevcut sahibin bilgisi
+            self.cursor.execute(
+                "SELECT user_id, username, role FROM users WHERE user_id = %s",
+                (current_user_id,)
+            )
+            current_user = self.cursor.fetchone()
+
+            if current_user is None:
+                return {
+                    "can_override": False,
+                    "message": "Mevcut rezervasyon sahibinin kullanıcı bilgisi bulunamadı."
+                }
+
+            owner_id, owner_name, owner_role = current_user
+
+            # Rol karşılaştırması
+            if requester_role > owner_role:
+                return {
+                    "can_override": True,
+                    "needs_confirmation": True,
+                    "reservation_id": reservation_id,
+                    "owner_user_id": owner_id,
+                    "owner_username": owner_name,
+                    "owner_role": owner_role,
+                    "facility_id": facility_id,
+                    "date": date,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "status": status
+                }
+
+            return {
+                "can_override": False,
+                "needs_confirmation": False,
+                "message": "Bu rezervasyon daha yüksek veya eşit öncelikli bir kullanıcıda olduğu için alınamaz."
+            }
+
+        except psycopg.Error as err:
+            print(f"Override detayları alınırken hata oluştu: {err}")
+            traceback.print_exc()
+            return {
+                "can_override": False,
+                "message": "Override kontrolü sırasında veritabanı hatası oluştu."
+            }
+
+        except Exception as e:
+            print(f"Beklenmeyen hata: {e}")
+            traceback.print_exc()
+            return {
+                "can_override": False,
+                "message": "Beklenmeyen bir hata oluştu."
+            }

@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
 
-# Proje dosyaların
+
 from database_functions import Database
 from reservation_ui import ReservationScreen
 
@@ -16,7 +16,7 @@ class Main(QMainWindow):
         self.db_manager = Database()
         self.active_windows = []
         
-        # Kullanıcı bilgilerini en başta bir kez çekelim
+        # Kullanıcı bilgilerini en başta çekiliyor.
         self.user_data = self.db_manager.get_user(self.user_id)
         
         self.init_ui()
@@ -147,7 +147,7 @@ class Main(QMainWindow):
                 QMessageBox.warning(dialog, "Short Password", "Password must be at least 4 characters.")
                 return
             
-            # Database fonksiyonunu çağırıyoruz
+            # Database fonksiyonunu çağırıyoruz.
             res = self.db_manager.update_password(self.user_id, new_p)
             QMessageBox.information(dialog, "Success", res)
             self.new_pass_input.clear()
@@ -233,6 +233,7 @@ class Main(QMainWindow):
             main_win.resize(550, 350)
         else: self.close()
 
+"""Debugging amacı ile sadece main_menu.py'ı  çağırabilmek için dolduruldu."""
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication
     app = QApplication(sys.argv)

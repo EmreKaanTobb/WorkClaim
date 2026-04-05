@@ -54,6 +54,7 @@ class LoginPage(QWidget):
         super().__init__()
         self.switch_to_signup = switch_to_signup
         self.login_success = login_success
+        self.first_login_done = False  #FLAG
         self.init_ui()
 
     def init_ui(self):
@@ -126,9 +127,38 @@ class LoginPage(QWidget):
         pw = self.password.text()
 
         if db.login_user(uid, pw):
+
+            if not self.first_login_done:
+                notifications = db.bring_notifications(uid)
+
+                if notifications:
+                    messages = []
+
+                    for n in notifications:
+                        reservation_id = n[1]
+
+                        res = db.get_reservation(reservation_id)
+
+                        if res:
+                            _, user_id, facility_id, date, start, end, status = res
+
+                            msg = (
+                                f"{date} tarihinde, {start}-{end} saatleri arasında\n"
+                                f"{facility_id} numaralı alan için yaptığınız randevunuz iptal edilmiştir."
+                            )
+
+                            messages.append(msg)
+
+                    if messages:
+                        final_msg = "\n\n".join(messages)
+                        QMessageBox.information(self, "Bildirimler", final_msg)
+
+                self.first_login_done = True
+
             self.login_success(uid)
+
         else:
-            QMessageBox.warning(self, "Error", "Invalid credentials")
+            QMessageBox.warning(self, "Hata", "Geçersiz kullanıcı bilgileri")
 
 
 # Kaydol sayfası
@@ -293,6 +323,7 @@ class MainWindow(QStackedWidget):
         self.addWidget(self.home_page)
 
         self.setCurrentWidget(self.login_page)
+        self.first_login_done = False
 
     def show_signup(self):
         self.setCurrentWidget(self.signup_page)
@@ -313,6 +344,7 @@ class MainWindow(QStackedWidget):
         self.window().resize(1000, 700)
 
     def logout(self):
+        self.login_page.first_login_done = False
         self.setCurrentWidget(self.login_page)
 
 

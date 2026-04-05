@@ -342,7 +342,6 @@ class ReservationScreen(QWidget):
             )
             return
 
-
         # Listeden seçilen facility'nin gerçek veritabanı kaydını alıyoruz.
         selected_facility = self.filtered_facilities[selected_item]
         facility_id = selected_facility[0]
@@ -352,7 +351,6 @@ class ReservationScreen(QWidget):
         print("selected_date =", selected_date)
         print("start_time =", start_time)
         print("end_time =", end_time)
-
 
         # Seçilen facility , tarih ve  saat aralığı için uygun reservation slot'unu arıyoruz.
         reservation_id = self.db.find_reservation_slot(
@@ -374,6 +372,55 @@ class ReservationScreen(QWidget):
             )
             return
 
+        # Override gerekip gerekmediğini kontrol ediyoruz.
+        override_info = self.db.get_override_details(self.current_user_id, reservation_id)
+
+        # Hata / izin yok durumu
+        if not override_info.get("can_override", False) and override_info.get("needs_confirmation", False) is False:
+            normal_messages = {
+                "Bu slot doğrudan alınabilir.",
+                "Bu rezervasyon zaten size ait."
+            }
+
+            if override_info.get("message") not in normal_messages:
+                QMessageBox.warning(
+                    self,
+                    "Result",
+                    override_info.get("message", "An error occurred while checking the reservation.")
+                )
+                return
+
+        # Override confirmation gerekiyorsa kullanıcıya mevcut sahibin bilgilerini göster
+        if override_info.get("needs_confirmation", False):
+            role_map = {
+                1: "Student",
+                2: "Teacher",
+                3: "Administrator"
+            }
+
+            owner_role_text = role_map.get(override_info["owner_role"], "Unknown")
+
+            confirm_text = (
+                "Bu randevunun zaten bir sahibi bulunuyor.\n\n"
+                f"Sahip Kullanıcı adı: {override_info['owner_username']}\n"
+                f"Sahip kullanıcının rolü: {owner_role_text}\n"
+                f"Facility ID: {override_info['facility_id']}\n"
+                f"Tarih: {override_info['date']}\n"
+                f"Zaman Aralığı: {override_info['start_time']} - {override_info['end_time']}\n\n"
+                "Bu randevuyu yine de almak istediğinizden emin misiniz?"
+            )
+
+            answer = QMessageBox.question(
+                self,
+                "Override Confirmation",
+                confirm_text,
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+
+            if answer != QMessageBox.Yes:
+                return
+
         # Rezervasyon işlemini veritabanında gerçekleştiriyoruz.
         result_message = self.db.reserve(self.current_user_id, reservation_id)
 
@@ -386,11 +433,8 @@ class ReservationScreen(QWidget):
 
     def go_back(self):
 
-        # Geri ana sayfaya dönme .
+        self.close()
         
-        QMessageBox.information(self, "Navigation", "Going back to Main Menu...")
-        
-
 
 # Program doğrudan çalıştırılırsa burası devreye girer
 if __name__ == '__main__':
